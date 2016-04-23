@@ -12,6 +12,25 @@
                 <filtering>true</filtering>
             </resource>
         </resources>
+        <plugins>
+            <plugin>
+                <groupId>net.md-5</groupId>
+                <artifactId>scriptus</artifactId>
+                <version>0.1</version>
+                <executions>
+                    <execution>
+                        <phase>initialize</phase>
+                        <goals>
+                            <goal>describe</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <descriptionProperty>git_hash</descriptionProperty>
+                    <format>%s</format>
+                </configuration>
+            </plugin>
+        </plugins>
     </build>
     <repositories>
         <repository>
