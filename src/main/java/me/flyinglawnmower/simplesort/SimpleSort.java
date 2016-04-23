@@ -17,7 +17,6 @@ import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
-import org.bukkit.configuration.file.FileConfigurationOptions;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -34,72 +33,19 @@ import org.bukkit.plugin.java.JavaPlugin;
 
 public class SimpleSort extends JavaPlugin implements Listener {
 
-    private Permission inventorySortPerm = new Permission("simplesort.inventory");
-    private Permission chestSortPerm = new Permission("simplesort.chest");
-    private Permission wandSortPerm = new Permission("simplesort.chest.wand");
-    private Permission autoSortPerm = new Permission("simplesort.chest.auto");
+    private final Permission inventorySortPerm = new Permission("simplesort.inventory");
+    private final Permission chestSortPerm = new Permission("simplesort.chest");
+    private final Permission wandSortPerm = new Permission("simplesort.chest.wand");
+    private final Permission autoSortPerm = new Permission("simplesort.chest.auto");
 
-    private String autoSortConfigPath = "auto-sorting";
-    private HashMap<String, Boolean> autoSortList = new HashMap<String, Boolean>();
+    private final String autoSortConfigPath = "auto-sorting";
+    private final HashMap<String, Boolean> autoSortList = new HashMap<>();
     private Material wand;
 
-    private void sortInventory(Inventory inventory, int startIndex, int endIndex) {
-        ItemStack[] items = inventory.getContents();
-        boolean stackAll = getConfig().getBoolean("stack-all");
-
-        for (int i = startIndex; i < endIndex; i++) {
-            ItemStack item1 = items[i];
-
-            if (item1 == null) {
-                continue;
-            }
-
-            int maxStackSize = stackAll ? 64 : item1.getMaxStackSize();
-
-            if (item1.getAmount() <= 0 || maxStackSize == 1) {
-                continue;
-            }
-
-            if (item1.getAmount() < maxStackSize) {
-                int needed = maxStackSize - item1.getAmount();
-
-                for (int j = i + 1; j < endIndex; j++) {
-                    ItemStack item2 = items[j];
-
-                    if (item2 == null || item2.getAmount() <= 0 || maxStackSize == 1) {
-                        continue;
-                    }
-
-                    if (item2.getType() == item1.getType()
-                            && item1.getDurability() == item2.getDurability()
-                            && item1.getEnchantments().equals(item2.getEnchantments())
-                            && item1.getItemMeta().equals(item2.getItemMeta())) {
-                        if (item2.getAmount() > needed) {
-                            item1.setAmount(maxStackSize);
-                            item2.setAmount(item2.getAmount() - needed);
-                            break;
-                        } else {
-                            items[j] = null;
-                            item1.setAmount(item1.getAmount() + item2.getAmount());
-                            needed = maxStackSize - item1.getAmount();
-                        }
-                    }
-                }
-            }
-        }
-
-        Arrays.sort(items, startIndex, endIndex, new ItemComparator());
-        inventory.setContents(items);
-    }
-
+    @Override
     public void onEnable() {
-        FileConfigurationOptions options = getConfig().options();
+        saveDefaultConfig();
 
-        options.header("enable-wand: Whether or not to allow sorting with the wand.\n"
-                + "wand: The item ID of the chest-sorting wand (AIR for hand).\n"
-                + "stack-all: Whether or not to stack all item types to 64.");
-        options.copyDefaults(true);
-        saveConfig();
         wand = Material.matchMaterial(getConfig().getString("wand", "STICK"));
 
         if (getConfig().isSet(autoSortConfigPath)) {
@@ -111,6 +57,7 @@ public class SimpleSort extends JavaPlugin implements Listener {
         getServer().getPluginManager().registerEvents(this, this);
     }
 
+    @Override
     public void onDisable() {
         if (!autoSortList.isEmpty()) {
             for (Entry<String, Boolean> entry : autoSortList.entrySet()) {
@@ -130,6 +77,7 @@ public class SimpleSort extends JavaPlugin implements Listener {
         event.getPlayer().setMetadata("commandSorting", new FixedMetadataValue(this, false));
     }
 
+    @Override
     public boolean onCommand(CommandSender sender, Command command, String commandLabel, String[] args) {
         if (sender instanceof Player) {
             if (command.getName().equalsIgnoreCase("sort")) {
@@ -248,5 +196,54 @@ public class SimpleSort extends JavaPlugin implements Listener {
             sortInventory(inventory, 0, inventory.getSize());
             player.sendMessage(ChatColor.DARK_GREEN + "Chest sorted!");
         }
+    }
+
+    private void sortInventory(Inventory inventory, int startIndex, int endIndex) {
+        ItemStack[] items = inventory.getContents();
+        boolean stackAll = getConfig().getBoolean("stack-all");
+
+        for (int i = startIndex; i < endIndex; i++) {
+            ItemStack item1 = items[i];
+
+            if (item1 == null) {
+                continue;
+            }
+
+            int maxStackSize = stackAll ? 64 : item1.getMaxStackSize();
+
+            if (item1.getAmount() <= 0 || maxStackSize == 1) {
+                continue;
+            }
+
+            if (item1.getAmount() < maxStackSize) {
+                int needed = maxStackSize - item1.getAmount();
+
+                for (int j = i + 1; j < endIndex; j++) {
+                    ItemStack item2 = items[j];
+
+                    if (item2 == null || item2.getAmount() <= 0 || maxStackSize == 1) {
+                        continue;
+                    }
+
+                    if (item2.getType() == item1.getType()
+                            && item1.getDurability() == item2.getDurability()
+                            && item1.getEnchantments().equals(item2.getEnchantments())
+                            && item1.getItemMeta().equals(item2.getItemMeta())) {
+                        if (item2.getAmount() > needed) {
+                            item1.setAmount(maxStackSize);
+                            item2.setAmount(item2.getAmount() - needed);
+                            break;
+                        } else {
+                            items[j] = null;
+                            item1.setAmount(item1.getAmount() + item2.getAmount());
+                            needed = maxStackSize - item1.getAmount();
+                        }
+                    }
+                }
+            }
+        }
+
+        Arrays.sort(items, startIndex, endIndex, new ItemComparator());
+        inventory.setContents(items);
     }
 }
