@@ -28,6 +28,7 @@
                 <configuration>
                     <descriptionProperty>git_hash</descriptionProperty>
                     <format>%s</format>
+                    <hashLength>40</hashLength>
                 </configuration>
             </plugin>
         </plugins>
