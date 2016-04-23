@@ -8,6 +8,7 @@ package me.flyinglawnmower.simplesort;
  */
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map.Entry;
 import java.util.Set;
 
@@ -17,6 +18,7 @@ import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
+import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -31,7 +33,7 @@ import org.bukkit.metadata.FixedMetadataValue;
 import org.bukkit.permissions.Permission;
 import org.bukkit.plugin.java.JavaPlugin;
 
-public class SimpleSort extends JavaPlugin implements Listener {
+public class SimpleSort extends JavaPlugin implements Listener, TabCompleter {
 
     private final Permission inventorySortPerm = new Permission("simplesort.inventory");
     private final Permission chestSortPerm = new Permission("simplesort.chest");
@@ -169,6 +171,17 @@ public class SimpleSort extends JavaPlugin implements Listener {
             return true;
         }
         return false;
+    }
+
+    @Override
+    public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
+        if (args.length >= 1 && args[0].equalsIgnoreCase("auto")) {
+            return Arrays.asList("on", "off");
+        }
+        if (args.length <= 1) {
+            return Arrays.asList("top", "all", "hot", "chest", "auto");
+        }
+        return null;
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
