@@ -1,0 +1,35 @@
+name: SimpleSort
+version: ${project.version}-b${BUILD_NUMBER}
+description: A simple inventory/chest sorting plugin.
+author: FlyingLawnmowerDev
+authors: [Shadow1013GL, Pyr0Byt3, pendo324]
+main: me.flyinglawnmower.simplesort.SimpleSort
+commands:
+  sort:
+    aliases: [simplesort, ss]
+    description: Sorts inventories.
+    usage: |
+      /<command> - Sorts top part, or currently targeted chest.
+      /<command> top - Sorts top part of your inventory.
+      /<command> all - Sorts all of your inventory.
+      /<command> hot - Sorts your hotbar.
+      /<command> chest - Sorts currently targeted chest.
+      /<command> auto [on|off] - Toggles auto-sorting opened chests.
+permissions:
+  simplesort.chest:
+    description: Allows the player to sort chests.
+    children:
+      simplesort.chest.auto: true
+      simplesort.chest.wand: true
+  simplesort.chest.auto:
+    description: Allows the player to auto-sort chests when they open them.
+  simplesort.chest.wand:
+    description: Allows the player to sort chests using the wand.
+  simplesort.inventory:
+    description: Allows the player to sort their own inventory.
+  simplesort.*:
+    description: Allows the player to sort both chests and their own inventory.
+    default: op
+    children:
+      simplesort.chest: true
+      simplesort.inventory: true
