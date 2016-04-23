@@ -1,5 +1,5 @@
 name: SimpleSort
-version: ${project.version}
+version: ${project.version}-b${BUILD_NUMBER}
 
 git_repo: https://github.com/Samistine/SimpleSort
 git_hash: ${git_hash}
