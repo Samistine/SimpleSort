@@ -187,7 +187,7 @@ public class SimpleSort extends JavaPlugin implements Listener, TabCompleter {
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onPlayerInteract(PlayerInteractEvent event) {
         Player player = event.getPlayer();
-        boolean commandSorting = player.getMetadata("commandSorting").get(0).asBoolean();
+        boolean commandSorting = player.hasMetadata("commandSorting") && player.getMetadata("commandSorting").size() > 0 && player.getMetadata("commandSorting").get(0).asBoolean();
 
         if (event.getAction() == Action.LEFT_CLICK_BLOCK
                 && event.getMaterial() == wand
