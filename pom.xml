@@ -3,7 +3,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>com.samistine.mcplugins</groupId>
     <artifactId>SimpleSort</artifactId>
-    <version>1.0</version>
+    <version>Samistine-1.0</version>
     <build>         
         <finalName>SimpleSort</finalName>
         <resources>
