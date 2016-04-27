@@ -4,7 +4,7 @@ import java.util.Comparator;
 
 import org.bukkit.inventory.ItemStack;
 
-public class ItemComparator implements Comparator<ItemStack> {
+public final class ItemComparator implements Comparator<ItemStack> {
 
     @Override
     public int compare(ItemStack item1, ItemStack item2) {
