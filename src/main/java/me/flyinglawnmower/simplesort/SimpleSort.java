@@ -6,11 +6,12 @@ package me.flyinglawnmower.simplesort;
  * - Pyr0Byt3
  * - pendo324
  */
+import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
+import java.util.Collections;
 import java.util.List;
-import java.util.Map.Entry;
-import java.util.Set;
+import java.util.UUID;
+import java.util.logging.Level;
 
 import org.bukkit.ChatColor;
 import org.bukkit.Material;
@@ -33,7 +34,9 @@ import org.bukkit.metadata.FixedMetadataValue;
 import org.bukkit.permissions.Permission;
 import org.bukkit.plugin.java.JavaPlugin;
 
-public class SimpleSort extends JavaPlugin implements Listener, TabCompleter {
+public final class SimpleSort extends JavaPlugin implements Listener, TabCompleter {
+
+    private final Material[] chests = {Material.CHEST, Material.TRAPPED_CHEST, Material.ENDER_CHEST};
 
     private final Permission inventorySortPerm = new Permission("simplesort.inventory");
     private final Permission chestSortPerm = new Permission("simplesort.chest");
@@ -41,7 +44,7 @@ public class SimpleSort extends JavaPlugin implements Listener, TabCompleter {
     private final Permission autoSortPerm = new Permission("simplesort.chest.auto");
 
     private final String autoSortConfigPath = "auto-sorting";
-    private final HashMap<String, Boolean> autoSortList = new HashMap<>();
+    private final List<UUID> autoSortList = new ArrayList<>();
     private Material wand;
 
     @Override
@@ -51,8 +54,12 @@ public class SimpleSort extends JavaPlugin implements Listener, TabCompleter {
         wand = Material.matchMaterial(getConfig().getString("wand", "STICK"));
 
         if (getConfig().isSet(autoSortConfigPath)) {
-            for (String key : getConfig().getConfigurationSection(autoSortConfigPath).getKeys(false)) {
-                autoSortList.put(key, getConfig().getBoolean(autoSortConfigPath + "." + key));
+            for (String uuidStr : getConfig().getStringList(autoSortConfigPath)) {
+                try {
+                    autoSortList.add(UUID.fromString(uuidStr));
+                } catch (IllegalArgumentException ex) {
+                    getLogger().log(Level.WARNING, "Invalid UUID in config. Will be removed on next save");
+                }
             }
         }
 
@@ -61,21 +68,12 @@ public class SimpleSort extends JavaPlugin implements Listener, TabCompleter {
 
     @Override
     public void onDisable() {
-        if (!autoSortList.isEmpty()) {
-            for (Entry<String, Boolean> entry : autoSortList.entrySet()) {
-                getConfig().set(autoSortConfigPath + "." + entry.getKey(), entry.getValue());
-            }
-            saveConfig();
-        }
+        getConfig().set(autoSortConfigPath, autoSortList);
+        saveConfig();
     }
 
     @EventHandler
     public void onPlayerLogin(PlayerLoginEvent event) {
-        Player player = event.getPlayer();
-
-        if (player.hasPermission(autoSortPerm) && !autoSortList.containsKey(player.getName())) {
-            autoSortList.put(player.getName(), false);
-        }
         event.getPlayer().setMetadata("commandSorting", new FixedMetadataValue(this, false));
     }
 
@@ -84,8 +82,7 @@ public class SimpleSort extends JavaPlugin implements Listener, TabCompleter {
         if (sender instanceof Player) {
             if (command.getName().equalsIgnoreCase("sort")) {
                 Player player = (Player) sender;
-                Set<Material> nullset = null;
-                Block block = player.getTargetBlock(nullset, 4);
+                Block block = player.getTargetBlock(Collections.singleton(Material.AIR), 4);
 
                 if (args.length == 0) {
                     if (block.getType() == Material.CHEST
@@ -101,9 +98,7 @@ public class SimpleSort extends JavaPlugin implements Listener, TabCompleter {
                 switch (args[0].toLowerCase()) {
                     case "chest":
                         if (player.hasPermission(chestSortPerm)) {
-                            if (block.getType() == Material.CHEST
-                                    || block.getType() == Material.TRAPPED_CHEST
-                                    || block.getType() == Material.ENDER_CHEST) {
+                            if (isChest(block.getType())) {
                                 player.setMetadata("commandSorting", new FixedMetadataValue(this, true));
                                 getServer().getPluginManager().callEvent(new PlayerInteractEvent(player, Action.LEFT_CLICK_BLOCK, new ItemStack(wand), block, BlockFace.SELF));
                                 return true;
@@ -142,18 +137,22 @@ public class SimpleSort extends JavaPlugin implements Listener, TabCompleter {
                     case "auto":
                         if (player.hasPermission(autoSortPerm)) {
                             if (args.length == 1) {
-                                autoSortList.put(player.getName(), !autoSortList.get(player.getName()));
+                                if (autoSortList.contains(player.getUniqueId())) {
+                                    autoSortList.remove(player.getUniqueId());
+                                } else {
+                                    autoSortList.add(player.getUniqueId());
+                                }
                             } else if (args.length > 1) {
                                 if (args[1].equalsIgnoreCase("on")) {
-                                    autoSortList.put(player.getName(), true);
+                                    autoSortList.add(player.getUniqueId());
                                 } else if (args[1].equalsIgnoreCase("off")) {
-                                    autoSortList.put(player.getName(), false);
+                                    autoSortList.remove(player.getUniqueId());
                                 } else {
                                     return false;
                                 }
                             }
 
-                            if (autoSortList.get(player.getName())) {
+                            if (autoSortList.contains(player.getUniqueId())) {
                                 player.sendMessage(ChatColor.DARK_GREEN + "Auto-sorting enabled!");
                             } else {
                                 player.sendMessage(ChatColor.DARK_RED + "Auto-sorting disabled!");
@@ -189,11 +188,8 @@ public class SimpleSort extends JavaPlugin implements Listener, TabCompleter {
         Player player = event.getPlayer();
         boolean commandSorting = player.hasMetadata("commandSorting") && player.getMetadata("commandSorting").size() > 0 && player.getMetadata("commandSorting").get(0).asBoolean();
 
-        if (event.getAction() == Action.LEFT_CLICK_BLOCK
-                && event.getMaterial() == wand
-                && (player.hasPermission(wandSortPerm) || commandSorting)
-                || event.getAction() == Action.RIGHT_CLICK_BLOCK
-                && player.hasPermission(autoSortPerm) && autoSortList.get(player.getName())) {
+        if ((event.getAction() == Action.LEFT_CLICK_BLOCK && event.getMaterial() == wand && (player.hasPermission(wandSortPerm) || commandSorting))
+                || (event.getAction() == Action.RIGHT_CLICK_BLOCK && autoSortList.contains(player.getUniqueId()) && player.hasPermission(autoSortPerm))) {
             Block block = event.getClickedBlock();
             Inventory inventory;
 
@@ -209,6 +205,15 @@ public class SimpleSort extends JavaPlugin implements Listener, TabCompleter {
             sortInventory(inventory, 0, inventory.getSize());
             player.sendMessage(ChatColor.DARK_GREEN + "Chest sorted!");
         }
+    }
+
+    private boolean isChest(Material material) {
+        for (Material chest : chests) {
+            if (chest.equals(material)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private void sortInventory(Inventory inventory, int startIndex, int endIndex) {
