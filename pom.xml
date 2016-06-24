@@ -3,7 +3,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>com.samistine.mcplugins</groupId>
     <artifactId>SimpleSort</artifactId>
-    <version>Samistine-1.0</version>
+    <version>Samistine-1.1</version>
     <build>         
         <finalName>SimpleSort</finalName>
         <resources>
@@ -43,7 +43,7 @@
         <dependency>
             <groupId>org.bukkit</groupId>
             <artifactId>bukkit</artifactId>
-            <version>1.8-R0.1-SNAPSHOT</version>
+            <version>1.9.4-R0.1-SNAPSHOT</version>
         </dependency>
     </dependencies>
     <properties>

@@ -9,6 +9,7 @@ package me.flyinglawnmower.simplesort;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.UUID;
 import java.util.logging.Level;
@@ -26,7 +27,6 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.player.PlayerInteractEvent;
-import org.bukkit.event.player.PlayerLoginEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.ItemStack;
@@ -36,7 +36,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 
 public final class SimpleSort extends JavaPlugin implements Listener, TabCompleter {
 
-    private final Material[] chests = {Material.CHEST, Material.TRAPPED_CHEST, Material.ENDER_CHEST};
+    private final HashSet<Material> chests = new HashSet<>(Arrays.asList(Material.CHEST, Material.TRAPPED_CHEST, Material.ENDER_CHEST));
 
     private final Permission inventorySortPerm = new Permission("simplesort.inventory");
     private final Permission chestSortPerm = new Permission("simplesort.chest");
@@ -44,19 +44,21 @@ public final class SimpleSort extends JavaPlugin implements Listener, TabComplet
     private final Permission autoSortPerm = new Permission("simplesort.chest.auto");
 
     private final String autoSortConfigPath = "auto-sorting";
-    private final List<UUID> autoSortList = new ArrayList<>();
+    private final HashSet<UUID> autoSortSet = new HashSet<>();
     private Material wand;
+    private boolean stackAll;
 
     @Override
     public void onEnable() {
         saveDefaultConfig();
 
         wand = Material.matchMaterial(getConfig().getString("wand", "STICK"));
+        stackAll = getConfig().getBoolean("stack-all");
 
         if (getConfig().isSet(autoSortConfigPath)) {
             for (String uuidStr : getConfig().getStringList(autoSortConfigPath)) {
                 try {
-                    autoSortList.add(UUID.fromString(uuidStr));
+                    autoSortSet.add(UUID.fromString(uuidStr));
                 } catch (IllegalArgumentException ex) {
                     getLogger().log(Level.WARNING, "Invalid UUID in config. Will be removed on next save");
                 }
@@ -68,102 +70,96 @@ public final class SimpleSort extends JavaPlugin implements Listener, TabComplet
 
     @Override
     public void onDisable() {
-        getConfig().set(autoSortConfigPath, autoSortList);
+        getConfig().set(autoSortConfigPath, new ArrayList<>(autoSortSet));
         saveConfig();
-    }
-
-    @EventHandler
-    public void onPlayerLogin(PlayerLoginEvent event) {
-        event.getPlayer().setMetadata("commandSorting", new FixedMetadataValue(this, false));
     }
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String commandLabel, String[] args) {
         if (sender instanceof Player) {
-            if (command.getName().equalsIgnoreCase("sort")) {
-                Player player = (Player) sender;
-                Block block = player.getTargetBlock(Collections.singleton(Material.AIR), 4);
+            Player player = (Player) sender;
+            Block block = player.getTargetBlock(Collections.singleton(Material.AIR), 4);
 
-                if (args.length == 0) {
-                    if (block.getType() == Material.CHEST
-                            || block.getType() == Material.TRAPPED_CHEST
-                            || block.getType() == Material.ENDER_CHEST) {
-                        player.performCommand("sort chest");
+            if (args.length == 0) {
+                if (isChest(block.getType())) {
+                    player.performCommand("sort chest");
+                } else {
+                    player.performCommand("sort top");
+                }
+                return true;
+            }
+
+            switch (args[0].toLowerCase()) {
+                case "chest":
+                    if (player.hasPermission(chestSortPerm)) {
+                        if (isChest(block.getType())) {
+                            player.setMetadata("commandSorting", new FixedMetadataValue(this, true));
+                            getServer().getPluginManager().callEvent(new PlayerInteractEvent(player, Action.LEFT_CLICK_BLOCK, new ItemStack(wand), block, BlockFace.SELF));
+                            return true;
+                        } else {
+                            player.sendMessage(ChatColor.DARK_RED + "Not currently targeting a chest!");
+                            return true;
+                        }
                     } else {
-                        player.performCommand("sort top");
+                        player.sendMessage(ChatColor.DARK_RED + "You don't have permission to sort chests!");
+                    }
+                    break;
+                case "top":
+                    if (player.hasPermission(inventorySortPerm)) {
+                        sortInventory(player.getInventory(), 9, 36);
+                        player.sendMessage(ChatColor.DARK_GREEN + "Inventory top sorted!");
+                    } else {
+                        player.sendMessage(ChatColor.DARK_RED + "You don't have permission to sort your inventory!");
                     }
                     return true;
-                }
-
-                switch (args[0].toLowerCase()) {
-                    case "chest":
-                        if (player.hasPermission(chestSortPerm)) {
-                            if (isChest(block.getType())) {
-                                player.setMetadata("commandSorting", new FixedMetadataValue(this, true));
-                                getServer().getPluginManager().callEvent(new PlayerInteractEvent(player, Action.LEFT_CLICK_BLOCK, new ItemStack(wand), block, BlockFace.SELF));
-                                return true;
+                case "all":
+                    if (player.hasPermission(inventorySortPerm)) {
+                        sortInventory(player.getInventory(), 0, 36);
+                        player.sendMessage(ChatColor.DARK_GREEN + "Entire inventory sorted!");
+                    } else {
+                        player.sendMessage(ChatColor.DARK_RED + "You don't have permission to sort your inventory!");
+                    }
+                    return true;
+                case "hot":
+                    if (player.hasPermission(inventorySortPerm)) {
+                        sortInventory(player.getInventory(), 0, 9);
+                        player.sendMessage(ChatColor.DARK_GREEN + "Hotbar sorted!");
+                    } else {
+                        player.sendMessage(ChatColor.DARK_RED + "You don't have permission to sort your inventory!");
+                    }
+                    return true;
+                case "auto":
+                    if (player.hasPermission(autoSortPerm)) {
+                        if (args.length == 1) {
+                            if (autoSortSet.contains(player.getUniqueId())) {
+                                autoSortSet.remove(player.getUniqueId());
                             } else {
-                                player.sendMessage(ChatColor.DARK_RED + "Not currently targeting a chest!");
-                                return true;
+                                autoSortSet.add(player.getUniqueId());
                             }
-                        } else {
-                            player.sendMessage(ChatColor.DARK_RED + "You don't have permission to sort chests!");
-                        }
-                        break;
-                    case "top":
-                        if (player.hasPermission(inventorySortPerm)) {
-                            sortInventory(player.getInventory(), 9, 36);
-                            player.sendMessage(ChatColor.DARK_GREEN + "Inventory top sorted!");
-                        } else {
-                            player.sendMessage(ChatColor.DARK_RED + "You don't have permission to sort your inventory!");
-                        }
-                        return true;
-                    case "all":
-                        if (player.hasPermission(inventorySortPerm)) {
-                            sortInventory(player.getInventory(), 0, 36);
-                            player.sendMessage(ChatColor.DARK_GREEN + "Entire inventory sorted!");
-                        } else {
-                            player.sendMessage(ChatColor.DARK_RED + "You don't have permission to sort your inventory!");
-                        }
-                        return true;
-                    case "hot":
-                        if (player.hasPermission(inventorySortPerm)) {
-                            sortInventory(player.getInventory(), 0, 9);
-                            player.sendMessage(ChatColor.DARK_GREEN + "Hotbar sorted!");
-                        } else {
-                            player.sendMessage(ChatColor.DARK_RED + "You don't have permission to sort your inventory!");
-                        }
-                        return true;
-                    case "auto":
-                        if (player.hasPermission(autoSortPerm)) {
-                            if (args.length == 1) {
-                                if (autoSortList.contains(player.getUniqueId())) {
-                                    autoSortList.remove(player.getUniqueId());
-                                } else {
-                                    autoSortList.add(player.getUniqueId());
-                                }
-                            } else if (args.length > 1) {
-                                if (args[1].equalsIgnoreCase("on")) {
-                                    autoSortList.add(player.getUniqueId());
-                                } else if (args[1].equalsIgnoreCase("off")) {
-                                    autoSortList.remove(player.getUniqueId());
-                                } else {
+                        } else if (args.length > 1) {
+                            switch (args[1].toLowerCase()) {
+                                case "on":
+                                    autoSortSet.add(player.getUniqueId());
+                                    return true;
+                                case "off":
+                                    autoSortSet.remove(player.getUniqueId());
+                                    return true;
+                                default:
                                     return false;
-                                }
                             }
-
-                            if (autoSortList.contains(player.getUniqueId())) {
-                                player.sendMessage(ChatColor.DARK_GREEN + "Auto-sorting enabled!");
-                            } else {
-                                player.sendMessage(ChatColor.DARK_RED + "Auto-sorting disabled!");
-                            }
-                        } else {
-                            player.sendMessage(ChatColor.DARK_RED + "You don't have permission to use auto-sorting!");
                         }
-                        return true;
-                    default:
-                        return false;
-                }
+
+                        if (autoSortSet.contains(player.getUniqueId())) {
+                            player.sendMessage(ChatColor.DARK_GREEN + "Auto-sorting enabled!");
+                        } else {
+                            player.sendMessage(ChatColor.DARK_RED + "Auto-sorting disabled!");
+                        }
+                    } else {
+                        player.sendMessage(ChatColor.DARK_RED + "You don't have permission to use auto-sorting!");
+                    }
+                    return true;
+                default:
+                    return false;
             }
         } else {
             sender.sendMessage("You need to be a player to sort your inventory!");
@@ -189,7 +185,7 @@ public final class SimpleSort extends JavaPlugin implements Listener, TabComplet
         boolean commandSorting = player.hasMetadata("commandSorting") && player.getMetadata("commandSorting").size() > 0 && player.getMetadata("commandSorting").get(0).asBoolean();
 
         if ((event.getAction() == Action.LEFT_CLICK_BLOCK && event.getMaterial() == wand && (player.hasPermission(wandSortPerm) || commandSorting))
-                || (event.getAction() == Action.RIGHT_CLICK_BLOCK && autoSortList.contains(player.getUniqueId()) && player.hasPermission(autoSortPerm))) {
+                || (event.getAction() == Action.RIGHT_CLICK_BLOCK && autoSortSet.contains(player.getUniqueId()) && player.hasPermission(autoSortPerm))) {
             Block block = event.getClickedBlock();
             Inventory inventory;
 
@@ -208,17 +204,11 @@ public final class SimpleSort extends JavaPlugin implements Listener, TabComplet
     }
 
     private boolean isChest(Material material) {
-        for (Material chest : chests) {
-            if (chest.equals(material)) {
-                return true;
-            }
-        }
-        return false;
+        return chests.contains(material);
     }
 
     private void sortInventory(Inventory inventory, int startIndex, int endIndex) {
         ItemStack[] items = inventory.getContents();
-        boolean stackAll = getConfig().getBoolean("stack-all");
 
         for (int i = startIndex; i < endIndex; i++) {
             ItemStack item1 = items[i];
@@ -236,8 +226,8 @@ public final class SimpleSort extends JavaPlugin implements Listener, TabComplet
             if (item1.getAmount() < maxStackSize) {
                 int needed = maxStackSize - item1.getAmount();
 
-                for (int j = i + 1; j < endIndex; j++) {
-                    ItemStack item2 = items[j];
+                for (int ii = i + 1; ii < endIndex; ii++) {
+                    ItemStack item2 = items[ii];
 
                     if (item2 == null || item2.getAmount() <= 0 || maxStackSize == 1) {
                         continue;
@@ -252,7 +242,7 @@ public final class SimpleSort extends JavaPlugin implements Listener, TabComplet
                             item2.setAmount(item2.getAmount() - needed);
                             break;
                         } else {
-                            items[j] = null;
+                            items[ii] = null;
                             item1.setAmount(item1.getAmount() + item2.getAmount());
                             needed = maxStackSize - item1.getAmount();
                         }
